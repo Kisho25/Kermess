@@ -44,6 +44,7 @@ button { color: inherit; }
 }
 
 .brand { display: flex; gap: 12px; align-items: center; text-decoration: none; color: var(--ink); }
+.brand-logos { display: block; width: 230px; height: 64px; object-fit: contain; object-position: left center; }
 .brand-mark {
   display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px;
   background: var(--green); color: white; font: 800 20px/1 "Manrope", sans-serif;
@@ -170,6 +171,18 @@ kbd { border: 1px solid var(--line); border-radius: 5px; background: #f7f4ee; co
 .modal-card h2 { margin: 0; font-size: 25px; letter-spacing: -.04em; }
 .modal-summary { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 12px 0 25px; }
 .modal-actions { display: flex; }
+.payment-field { display: block; text-align: left; }
+.payment-field > span { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.payment-input-wrap { height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 13px; border: 1px solid var(--line); border-radius: 13px; background: white; transition: border-color .2s, box-shadow .2s; }
+.payment-input-wrap:focus-within { border-color: #86a596; box-shadow: 0 0 0 3px rgba(23,79,58,.08); }
+.payment-input-wrap input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 17px; font-weight: 700; }
+.payment-input-wrap strong { min-width: 40px; padding: 5px 8px; border-radius: 7px; background: #f1eee7; color: var(--green); text-align: center; font-size: 11px; }
+.payment-hint { margin: 7px 0 14px; color: #9a9f9b; text-align: left; font-size: 10px; }
+.change-result { margin: 0 0 16px; padding: 14px 16px; border-radius: 13px; background: var(--mint); text-align: left; }
+.change-result span, .change-result small { display: block; color: var(--muted); font-size: 10px; }
+.change-result strong { display: block; margin: 3px 0; color: var(--green); font: 800 22px/1.2 "Manrope", sans-serif; }
+.change-result.insufficient { background: #f8e5e1; }
+.change-result.insufficient strong { color: var(--danger); }
 .secondary-button { background: #eeeae3; color: var(--ink); box-shadow: none; }
 .secondary-button.compact { width: auto; height: 38px; padding: 0 15px; border-radius: 10px; font-size: 12px; }
 .report-modal { padding: 28px; }
@@ -179,7 +192,7 @@ kbd { border: 1px solid var(--line); border-radius: 5px; background: #f7f4ee; co
 .report-timestamp { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
 .report-header-actions { display: flex; align-items: center; gap: 8px; }
 .modal-close.inline { position: static; flex: 0 0 auto; }
-.report-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 28px; background: #f8f5ef; }
+.report-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px 28px; background: #f8f5ef; }
 .stat-card { padding: 15px 17px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .stat-card span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
 .stat-card strong { font: 800 18px/1.2 "Manrope", sans-serif; letter-spacing: -.03em; }
@@ -206,6 +219,7 @@ kbd { border: 1px solid var(--line); border-radius: 5px; background: #f7f4ee; co
   .topbar { height: 70px; padding: 0 18px; }
   .header-meta, .search-box kbd { display: none; }
   .header-actions { gap: 0; }.report-button { padding: 8px 11px; }
+  .brand-logos { width: 155px; height: 52px; }
   .catalog-content { padding: 27px 16px 40px; }
   .catalog-heading { display: block; }
   .search-box { width: 100%; margin-top: 20px; }

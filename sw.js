@@ -1,5 +1,5 @@
-const CACHE_NAME = "kermess-pos-v6";
-const APP_FILES = ["./", "./index.html", "./styles.css", "./config.js", "./app.js"];
+const CACHE_NAME = "kermess-pos-v13";
+const APP_FILES = ["./", "./index.html", "./styles.css", "./config.js", "./app.js", "./favicon.png", "./festival-logos.png"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_FILES)));

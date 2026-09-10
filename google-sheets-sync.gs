@@ -66,7 +66,7 @@ function syncKermessSales() {
       const product = PRODUCTS[item.id] || [`Item ${item.id}`,null,'Pending',''];
       const quantity = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
-      rawRows.push([order.order_number, order.local_order_number, new Date(order.completed_at), order.terminal_id, order.id, product[0], quantity, price, quantity * price]);
+      rawRows.push([order.order_number, order.local_order_number, new Date(order.completed_at), order.terminal_id, order.id, product[0], quantity, price]);
       if (!totals[item.id]) totals[item.id] = { quantity:0, revenue:0, latestPrice:price };
       totals[item.id].quantity += quantity;
       totals[item.id].revenue += quantity * price;
@@ -79,11 +79,12 @@ function syncKermessSales() {
     const total = totals[id];
     const providerPayment = product[1] === null ? 'Pending' : product[1] * total.quantity;
     const profit = product[1] === null ? 'Pending' : total.revenue - providerPayment;
-    return [product[0], product[2], product[3], total.quantity, total.latestPrice, total.revenue, product[1] === null ? 'Pending' : product[1], providerPayment, profit];
+    const profitPerItem = product[1] === null ? 'Pending' : total.latestPrice - product[1];
+    return [product[0], product[2], product[3], total.quantity, total.latestPrice, product[1] === null ? 'Pending' : product[1], profitPerItem, providerPayment, profit];
   });
 
-  writeSheet_('Sales Log', ['Global Order','Local Order','Completed At','Terminal ID','Sale UUID','Item','Quantity','Unit Price LBP','Cash Collected LBP'], rawRows, [8,9]);
-  writeSheet_('Item Report', ['Item','Provider','Contact','Items Sold','Sale Price LBP','Cash Collected LBP','Provider Price LBP','Pay Provider LBP','Profit LBP'], reportRows, [5,6,7,8,9]);
+  writeSheet_('Sales Log', ['Global Order','Local Order','Completed At','Terminal ID','Sale UUID','Item','Quantity','Sale Price LBP'], rawRows, [8]);
+  writeSheet_('Item Report', ['Item','Provider','Contact','Items Sold','Sale Price LBP','Provider / Item LBP','Profit / Item LBP','Total to Provider LBP','Total Profit LBP'], reportRows, [5,6,7,8,9]);
   PropertiesService.getScriptProperties().setProperty('LAST_SUCCESSFUL_SYNC', new Date().toISOString());
 }
 

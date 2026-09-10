@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#f8f5ef" />
   <title>Kermess POS</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="favicon.png" />
+  <link rel="apple-touch-icon" href="favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
@@ -15,11 +17,7 @@
     <section class="catalog-panel">
       <header class="topbar">
         <a class="brand" href="#" aria-label="Kermess POS home">
-          <span class="brand-mark">K</span>
-          <span>
-            <strong>Kermess</strong>
-            <small>Festival POS</small>
-          </span>
+          <img class="brand-logos" src="festival-logos.png" alt="Kermess festival organizations" />
         </a>
         <div class="header-actions">
           <button id="openReport" class="report-button" type="button">Sales report</button>
@@ -102,11 +100,24 @@
       <div class="success-icon">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12 3 3 7-7"></path></svg>
       </div>
-      <p class="eyebrow">Order complete</p>
-      <h2 id="saleTitle">Payment collected!</h2>
+      <p class="eyebrow">Complete order</p>
+      <h2 id="saleTitle">Enter customer payment</h2>
       <p id="modalSummary" class="modal-summary"></p>
+      <label class="payment-field">
+        <span>Amount received</span>
+        <div class="payment-input-wrap">
+          <input id="paymentAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 50 or 1,100,000" />
+          <strong id="detectedCurrency">—</strong>
+        </div>
+      </label>
+      <p class="payment-hint">Up to 3 digits = USD · 4+ digits = LBP</p>
+      <div id="changeResult" class="change-result" hidden>
+        <span id="changeLabel">Change to return</span>
+        <strong id="changeLbp"></strong>
+        <small id="changeUsd"></small>
+      </div>
       <div class="modal-actions">
-        <button id="newOrder" class="complete-button" type="button">Start new order</button>
+        <button id="newOrder" class="complete-button" type="button" disabled>Confirm sale &amp; new order</button>
       </div>
     </section>
   </div>
@@ -124,7 +135,7 @@
       <div id="reportStats" class="report-stats"></div>
       <div class="report-table-wrap">
         <table class="report-table">
-          <thead><tr><th>Item</th><th>Provider</th><th>Sold</th><th>Sale price</th><th>Cash collected</th><th>Pay provider</th><th>Profit</th></tr></thead>
+          <thead><tr><th>Item</th><th>Provider</th><th>Sold</th><th>Sale price</th><th>Provider/item</th><th>Profit/item</th><th>Total to provider</th><th>Total profit</th></tr></thead>
           <tbody id="reportRows"></tbody><tfoot id="reportTotals"></tfoot>
         </table>
         <div id="emptyReport" class="empty-state" hidden><span>▤</span><h2>No completed sales yet</h2><p>Completed orders will appear here.</p></div>

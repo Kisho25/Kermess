@@ -194,28 +194,71 @@ function showCompletedSale() {
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   completedCart = { items, count, total, orderNumber };
-  if (!currentSaleRecorded) {
-    currentSaleId ||= makeId();
-    sales = sales.filter(sale => sale.id !== currentSaleId);
-    sales.push({ id: currentSaleId, orderNumber, terminalId, synced: false, completedAt: new Date().toISOString(), items: items.map(({ id, quantity, price }) => ({ id, quantity, price })) });
-    localStorage.setItem("kermessSales", JSON.stringify(sales));
-    currentSaleRecorded = true;
-    syncPendingSales();
-  }
   $("#modalSummary").innerHTML = `Order #${String(orderNumber).padStart(3, "0")} · ${count} ${count === 1 ? "item" : "items"}<br><strong>${formatLbp(total)} · ${formatUsd(total)}</strong>`;
+  $("#paymentAmount").value = "";
+  $("#detectedCurrency").textContent = "—";
+  $("#changeResult").hidden = true;
+  $("#newOrder").disabled = true;
   $("#saleModal").hidden = false;
+  setTimeout(() => $("#paymentAmount").focus(), 50);
 }
 
 function closeSale() { $("#saleModal").hidden = true; }
 
 function startNewOrder() {
+  const payment = calculateChange();
+  if (!completedCart || !payment || payment.changeLbp < 0) return;
+  if (!currentSaleRecorded) {
+    currentSaleId ||= makeId();
+    sales = sales.filter(sale => sale.id !== currentSaleId);
+    sales.push({ id: currentSaleId, orderNumber, terminalId, synced: false, completedAt: new Date().toISOString(), payment, items: completedCart.items.map(({ id, quantity, price }) => ({ id, quantity, price })) });
+    localStorage.setItem("kermessSales", JSON.stringify(sales));
+    currentSaleRecorded = true;
+    syncPendingSales();
+  }
   cart = {};
   orderNumber += 1;
   localStorage.setItem("kermessOrderNumber", orderNumber);
   currentSaleRecorded = false;
   currentSaleId = null;
+  completedCart = null;
   closeSale();
   renderCart();
+}
+
+function calculateChange() {
+  const raw = $("#paymentAmount").value.replace(/,/g, "").replace(/\s/g, "");
+  const amount = Number(raw);
+  if (!raw || !Number.isFinite(amount) || amount < 0) {
+    $("#detectedCurrency").textContent = "—";
+    $("#changeResult").hidden = true;
+    $("#newOrder").disabled = true;
+    return null;
+  }
+  const currency = amount <= 999 ? "USD" : "LBP";
+  const tenderedLbp = currency === "USD" ? Math.round(amount * EXCHANGE_RATE) : Math.round(amount);
+  const changeLbp = tenderedLbp - completedCart.total;
+  const enough = changeLbp >= 0;
+  $("#detectedCurrency").textContent = currency;
+  $("#changeResult").hidden = false;
+  $("#changeResult").classList.toggle("insufficient", !enough);
+  $("#changeLabel").textContent = enough ? "Change to return" : "Amount still due";
+  $("#changeLbp").textContent = formatLbp(Math.abs(changeLbp));
+  $("#changeUsd").textContent = formatUsd(Math.abs(changeLbp));
+  $("#newOrder").disabled = !enough;
+  return { enteredAmount: amount, enteredCurrency: currency, tenderedLbp, changeLbp };
+}
+
+function formatPaymentAmount() {
+  const input = $("#paymentAmount");
+  const cleaned = input.value.replace(/,/g, "").replace(/[^0-9.]/g, "");
+  const parts = cleaned.split(".");
+  let whole = parts.shift() || "";
+  const decimal = parts.join("").slice(0, 2);
+  whole = whole.replace(/^0+(?=\d)/, "");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  input.value = grouped + (cleaned.includes(".") ? `.${decimal}` : "");
+  calculateChange();
 }
 
 function reportData(source = sales) {
@@ -241,10 +284,10 @@ function renderReport(source = sales) {
   const profit = rows.reduce((sum, row) => sum + (row.profit || 0), 0);
   const pending = rows.some(row => row.payment == null);
   $("#reportTimestamp").textContent = `Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())} · ${source.length} completed orders`;
-  $("#reportStats").innerHTML = `<div class="stat-card"><span>Items sold</span><strong>${sold}</strong></div><div class="stat-card"><span>Cash collected</span><strong>${formatLbp(revenue)}</strong></div><div class="stat-card"><span>Pay providers</span><strong>${formatLbp(payment)}${pending ? "*" : ""}</strong></div><div class="stat-card profit"><span>Profit</span><strong>${formatLbp(profit)}${pending ? "*" : ""}</strong></div>`;
+  $("#reportStats").innerHTML = `<div class="stat-card"><span>Items sold</span><strong>${sold}</strong></div><div class="stat-card"><span>Pay providers</span><strong>${formatLbp(payment)}${pending ? "*" : ""}</strong></div><div class="stat-card profit"><span>Profit</span><strong>${formatLbp(profit)}${pending ? "*" : ""}</strong></div>`;
   $("#emptyReport").hidden = rows.length !== 0;
-  $("#reportRows").innerHTML = rows.map(row => `<tr><td>${row.name}</td><td title="${row.contact || ""}">${row.provider || "Pending"}</td><td>${row.quantity}</td><td>${formatLbp(row.price)}</td><td>${formatLbp(row.revenue)}</td><td>${row.payment == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.payment)}</td><td>${row.profit == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.profit)}</td></tr>`).join("");
-  $("#reportTotals").innerHTML = rows.length ? `<tr><td colspan="2">TOTAL</td><td>${sold}</td><td>—</td><td>${formatLbp(revenue)}</td><td>${formatLbp(payment)}${pending ? "*" : ""}</td><td>${formatLbp(profit)}${pending ? "*" : ""}</td></tr>` : "";
+  $("#reportRows").innerHTML = rows.map(row => `<tr><td>${row.name}</td><td title="${row.contact || ""}">${row.provider || "Pending"}</td><td>${row.quantity}</td><td>${formatLbp(row.price)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.cost)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.price - row.cost)}</td><td>${row.payment == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.payment)}</td><td>${row.profit == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.profit)}</td></tr>`).join("");
+  $("#reportTotals").innerHTML = rows.length ? `<tr><td colspan="2">TOTAL</td><td>${sold}</td><td>—</td><td>—</td><td>—</td><td>${formatLbp(payment)}${pending ? "*" : ""}</td><td>${formatLbp(profit)}${pending ? "*" : ""}</td></tr>` : "";
 }
 
 async function openReport() {
@@ -259,8 +302,8 @@ async function openReport() {
 function closeReport() { $("#reportModal").hidden = true; }
 
 function exportReport() {
-  const heading = ["Item", "Provider", "Contact", "Items sold", "Sale price LBP", "Cash collected LBP", "Pay provider LBP", "Profit LBP"];
-  const body = reportData(lastReportSales).map(row => [row.name, row.provider || "Pending", row.contact || "", row.quantity, row.price, row.revenue, row.payment ?? "Pending", row.profit ?? "Pending"]);
+  const heading = ["Item", "Provider", "Contact", "Items sold", "Sale price LBP", "Provider per item LBP", "Profit per item LBP", "Total to provider LBP", "Total profit LBP"];
+  const body = reportData(lastReportSales).map(row => [row.name, row.provider || "Pending", row.contact || "", row.quantity, row.price, row.cost ?? "Pending", row.cost == null ? "Pending" : row.price - row.cost, row.payment ?? "Pending", row.profit ?? "Pending"]);
   const csv = [heading, ...body].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -353,6 +396,8 @@ $("#completeSale").addEventListener("click", showCompletedSale);
 $("#closeModal").addEventListener("click", closeSale);
 $(".modal-backdrop").addEventListener("click", closeSale);
 $("#newOrder").addEventListener("click", startNewOrder);
+$("#paymentAmount").addEventListener("input", formatPaymentAmount);
+$("#paymentAmount").addEventListener("keydown", event => { if (event.key === "Enter" && !$("#newOrder").disabled) startNewOrder(); });
 $("#openReport").addEventListener("click", openReport);
 $("#closeReport").addEventListener("click", closeReport);
 $("#reportModal .modal-backdrop").addEventListener("click", closeReport);
