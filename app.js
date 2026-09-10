@@ -36,7 +36,7 @@ const products = [
   { id: 33, name: "Play Station · 15 min", price: 450000, category: "Activities", icon: "🎮" },
   { id: 34, name: "Face Painting", price: 50000, category: "Activities", icon: "🎨" },
   { id: 35, name: "Mini Games", price: 50000, category: "Activities", icon: "🎯" },
-  { id: 36, name: "Box · per hit", price: 100000, category: "Activities", icon: "🥊" },
+  { id: 36, name: "Box · per hit", price: 50000, category: "Activities", icon: "🥊" },
   { id: 37, name: "VR", price: 500000, category: "Activities", icon: "🥽" }
 ];
 
@@ -71,7 +71,14 @@ const foodFinancials = {
   27: [200000, 100000, "Joceline", "03 773 860"],
   28: [50000, 25000, "Akhawiyat", "03 773 860"],
   29: [200000, 100000, "Chady Azar", "70 895 345"],
-  30: [300000, 200000, "Chady Azar", "70 895 345"]
+  30: [300000, 200000, "Chady Azar", "70 895 345"],
+  31: [300000, 0, "AC Inflatables", ""],
+  32: [200000, 0, "Sahel Alma", ""],
+  33: [450000, 0, "Anthony Chidiac", "81 030 873"],
+  34: [50000, 0, "Akhawiyat", "03 773 860"],
+  35: [50000, 15000, "Play Aura", "70 938 434"],
+  36: [50000, 35000, "Play Aura", "70 938 434"],
+  37: [500000, 360000, "Jack Chewan", "70 161 814"]
 };
 
 products.forEach(product => {
