@@ -192,11 +192,15 @@ kbd { border: 1px solid var(--line); border-radius: 5px; background: #f7f4ee; co
 .report-timestamp { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
 .report-header-actions { display: flex; align-items: center; gap: 8px; }
 .modal-close.inline { position: static; flex: 0 0 auto; }
-.report-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px 28px; background: #f8f5ef; }
+.report-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 20px 28px; background: #f8f5ef; }
 .stat-card { padding: 15px 17px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .stat-card span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
 .stat-card strong { font: 800 18px/1.2 "Manrope", sans-serif; letter-spacing: -.03em; }
 .stat-card.profit strong { color: var(--green); }
+.stat-card.cashier { background: var(--green); border-color: var(--green); }
+.stat-card.cashier span, .stat-card.cashier small { color: rgba(255,255,255,.7); }
+.stat-card.cashier strong { color: white; }
+.stat-card.cashier small { display: block; margin-top: 4px; font-size: 10px; }
 .report-table-wrap { flex: 1; overflow: auto; padding: 0 28px; }
 .report-table { width: 100%; border-collapse: collapse; white-space: nowrap; }
 .report-table th { position: sticky; top: 0; z-index: 1; padding: 13px 10px; background: var(--surface); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; text-align: right; text-transform: uppercase; letter-spacing: .06em; }
