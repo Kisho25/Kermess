@@ -1,4 +1,4 @@
-const CACHE_NAME = "kermess-pos-v15";
+const CACHE_NAME = "kermess-pos-v16";
 const APP_FILES = ["./", "./index.html", "./games/", "./games/index.html", "./styles.css", "./config.js", "./app.js", "./favicon.png", "./festival-logos.png"];
 
 self.addEventListener("install", event => {

@@ -92,7 +92,7 @@ products.forEach(product => {
 });
 
 const accents = { Food: "#f7dfcb", Sweets: "#f2dce5", Drinks: "#dcecf2", Snacks: "#eee4ca", Activities: "#dce9df" };
-const categories = activitiesOnly ? ["Activities"] : ["All", "Food", "Sweets", "Drinks", "Snacks", "Activities"];
+const categories = activitiesOnly ? ["Activities"] : ["All", "Food", "Sweets", "Drinks", "Snacks"];
 let activeCategory = activitiesOnly ? "Activities" : "All";
 let cart = {};
 let completedCart = null;
@@ -129,7 +129,10 @@ function renderTabs() {
 
 function filteredProducts() {
   const term = $("#searchInput").value.trim().toLowerCase();
-  return products.filter(item => (activeCategory === "All" || item.category === activeCategory) && item.name.toLowerCase().includes(term));
+  return products.filter(item => {
+    const belongsToPage = activitiesOnly ? item.category === "Activities" : item.category !== "Activities";
+    return belongsToPage && (activeCategory === "All" || item.category === activeCategory) && item.name.toLowerCase().includes(term);
+  });
 }
 
 function renderProducts() {
@@ -277,9 +280,13 @@ function reportData(source = sales) {
 }
 
 function renderReport(source = sales) {
-  const relevantSales = activitiesOnly
-    ? source.map(sale => ({ ...sale, items: sale.items.filter(item => products.find(product => product.id === Number(item.id))?.category === "Activities") })).filter(sale => sale.items.length)
-    : source;
+  const relevantSales = source.map(sale => ({
+    ...sale,
+    items: sale.items.filter(item => {
+      const isActivity = products.find(product => product.id === Number(item.id))?.category === "Activities";
+      return activitiesOnly ? isActivity : !isActivity;
+    })
+  })).filter(sale => sale.items.length);
   lastReportSales = relevantSales;
   const rows = reportData(relevantSales);
   const sold = rows.reduce((sum, row) => sum + row.quantity, 0);
