@@ -1,5 +1,4 @@
 const EXCHANGE_RATE = 90000;
-const activitiesOnly = /\/games(?:\/index\.html)?\/?$/.test(window.location.pathname);
 
 const products = [
   { id: 1, name: "Shawarma Lahme", price: 600000, category: "Food", icon: "🥙" },
@@ -28,14 +27,14 @@ const products = [
   { id: 24, name: "Carbonated Beer", price: 50000, category: "Drinks", icon: "🥂" },
   { id: 25, name: "XXL", price: 195000, category: "Drinks", icon: "⚡" },
   { id: 26, name: "Arguile", price: 500000, category: "Snacks", icon: "💨" },
-  { id: 27, name: "Cotton Candy", price: 100000, category: "Snacks", icon: "🍭" },
+  { id: 27, name: "Cotton Candy", price: 100000, category: "Sweets", icon: "🍭" },
   { id: 28, name: "Bzourat", price: 25000, category: "Snacks", icon: "🌻" },
   { id: 29, name: "Popcorn Wasat", price: 100000, category: "Snacks", icon: "🍿" },
   { id: 30, name: "Popcorn Kbir", price: 200000, category: "Snacks", icon: "🍿" },
   { id: 31, name: "Gonflables", price: 300000, category: "Activities", icon: "🏰" },
   { id: 32, name: "Trampoline", price: 200000, category: "Activities", icon: "🤸" },
   { id: 33, name: "Play Station · 15 min", price: 450000, category: "Activities", icon: "🎮" },
-  { id: 34, name: "Face Painting", price: 50000, category: "Activities", icon: "🎨" },
+  { id: 34, name: "Face Pawhy inting", price: 50000, category: "Activities", icon: "🎨" },
   { id: 35, name: "Mini Games", price: 50000, category: "Activities", icon: "🎯" },
   { id: 36, name: "Box · per hit", price: 50000, category: "Activities", icon: "🥊" },
   { id: 37, name: "VR", price: 500000, category: "Activities", icon: "🥽" }
@@ -92,8 +91,8 @@ products.forEach(product => {
 });
 
 const accents = { Food: "#f7dfcb", Sweets: "#f2dce5", Drinks: "#dcecf2", Snacks: "#eee4ca", Activities: "#dce9df" };
-const categories = activitiesOnly ? ["Activities"] : ["All", "Food", "Sweets", "Drinks", "Snacks"];
-let activeCategory = activitiesOnly ? "Activities" : "All";
+const categories = ["All", "Food", "Sweets", "Drinks", "Snacks", "Activities"];
+let activeCategory = "All";
 let cart = {};
 let completedCart = null;
 const ORDER_RESET_VERSION = "2026-09-10-001";
@@ -129,10 +128,7 @@ function renderTabs() {
 
 function filteredProducts() {
   const term = $("#searchInput").value.trim().toLowerCase();
-  return products.filter(item => {
-    const belongsToPage = activitiesOnly ? item.category === "Activities" : item.category !== "Activities";
-    return belongsToPage && (activeCategory === "All" || item.category === activeCategory) && item.name.toLowerCase().includes(term);
-  });
+  return products.filter(item => (activeCategory === "All" || item.category === activeCategory) && item.name.toLowerCase().includes(term));
 }
 
 function renderProducts() {
@@ -280,21 +276,14 @@ function reportData(source = sales) {
 }
 
 function renderReport(source = sales) {
-  const relevantSales = source.map(sale => ({
-    ...sale,
-    items: sale.items.filter(item => {
-      const isActivity = products.find(product => product.id === Number(item.id))?.category === "Activities";
-      return activitiesOnly ? isActivity : !isActivity;
-    })
-  })).filter(sale => sale.items.length);
-  lastReportSales = relevantSales;
-  const rows = reportData(relevantSales);
+  lastReportSales = source;
+  const rows = reportData(source);
   const sold = rows.reduce((sum, row) => sum + row.quantity, 0);
   const revenue = rows.reduce((sum, row) => sum + row.revenue, 0);
   const payment = rows.reduce((sum, row) => sum + (row.payment || 0), 0);
   const profit = rows.reduce((sum, row) => sum + (row.profit || 0), 0);
   const pending = rows.some(row => row.payment == null);
-  $("#reportTimestamp").textContent = `Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())} · ${relevantSales.length} completed orders`;
+  $("#reportTimestamp").textContent = `Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())} · ${source.length} completed orders`;
   $("#reportStats").innerHTML = `<div class="stat-card"><span>Items sold</span><strong>${sold}</strong></div><div class="stat-card"><span>Pay providers</span><strong>${formatLbp(payment)}${pending ? "*" : ""}</strong></div><div class="stat-card profit"><span>Profit</span><strong>${formatLbp(profit)}${pending ? "*" : ""}</strong></div><div class="stat-card cashier"><span>Cashier total</span><strong>${formatLbp(revenue)}</strong><small>${formatUsd(revenue)}</small></div>`;
   $("#emptyReport").hidden = rows.length !== 0;
   $("#reportRows").innerHTML = rows.map(row => `<tr><td>${row.name}</td><td title="${row.contact || ""}">${row.provider || "Pending"}</td><td>${row.quantity}</td><td>${formatLbp(row.price)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.cost)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.price - row.cost)}</td><td>${row.payment == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.payment)}</td><td>${row.profit == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.profit)}</td></tr>`).join("");
@@ -424,10 +413,6 @@ function updateClock() {
 
 renderTabs();
 renderCart();
-if (activitiesOnly) {
-  document.title = "Kermess Games POS";
-  $(".catalog-heading h1").textContent = "Choose an activity";
-}
 updateClock();
 setInterval(updateClock, 30000);
 window.addEventListener("online", syncPendingSales);
