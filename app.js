@@ -1,5 +1,5 @@
 const EXCHANGE_RATE = 90000;
-const activitiesOnly = /\/games(?:\/index\.html)?\/?$/.test(window.location.pathname);
+const activitiesOnly = Boolean(window.KERMESS_ACTIVITIES_ONLY) || /\/games(?:\/index\.html)?\/?$/.test(window.location.pathname);
 
 const products = [
   { id: 1, name: "Shawarma Lahme", price: 600000, category: "Food", icon: "🥙" },
@@ -16,7 +16,7 @@ const products = [
   { id: 12, name: "Nutella Oreo", price: 500000, category: "Sweets", icon: "🍪" },
   { id: 13, name: "Nutella Banana Nuts", price: 500000, category: "Sweets", icon: "🥜" },
   { id: 14, name: "Nutella Lotus", price: 500000, category: "Sweets", icon: "🧇" },
-  { id: 15, name: "Nutella Kinder Bueno", price: 550000, category: "Sweets", icon: "🍫" },
+  { id: 15, name: "Nutella Kinder Oreo", price: 700000, category: "Sweets", icon: "🍫" },
   { id: 16, name: "Brownies", price: 450000, category: "Sweets", icon: "🟫" },
   { id: 17, name: "Merry Cream", price: 200000, category: "Sweets", icon: "🍦" },
   { id: 18, name: "Limonade", price: 200000, category: "Drinks", icon: "🍋" },
@@ -36,7 +36,7 @@ const products = [
   { id: 32, name: "Trampoline", price: 200000, category: "Activities", icon: "🤸" },
   { id: 33, name: "Play Station · 15 min", price: 450000, category: "Activities", icon: "🎮" },
   { id: 34, name: "Face Painting", price: 50000, category: "Activities", icon: "🎨" },
-  { id: 35, name: "Mini Games", price: 50000, category: "Activities", icon: "🎯" },
+  { id: 35, name: "Bon Jeu", price: 50000, category: "Activities", icon: "🎯" },
   { id: 36, name: "Box · per hit", price: 50000, category: "Activities", icon: "🥊" },
   { id: 37, name: "VR", price: 500000, category: "Activities", icon: "🥽" }
 ];
@@ -56,8 +56,8 @@ const foodFinancials = {
   11: [600000, 500000, "Crepetna", "76 656 367"],
   12: [600000, 500000, "Crepetna", "76 656 367"],
   13: [600000, 500000, "Crepetna", "76 656 367"],
-  14: [600000, 500000, "Crepetna", "76 656 367"],
-  15: [650000, 550000, "Crepetna", "76 656 367"],
+  14: [650000, 550000, "Crepetna", "76 656 367"],
+  15: [700000, 600000, "Crepetna", "76 656 367"],
   16: [500000, 450000, "Orianne", "79 306 256"],
   17: [300000, 200000, "Marcelino Mikhael", "71 540 832"],
   18: [300000, 200000, "Elie Lteif (Frisco)", "03 502 849"],
@@ -92,7 +92,7 @@ products.forEach(product => {
 });
 
 const accents = { Food: "#f7dfcb", Sweets: "#f2dce5", Drinks: "#dcecf2", Snacks: "#eee4ca", Activities: "#dce9df" };
-const categories = activitiesOnly ? ["Activities"] : ["All", "Food", "Sweets", "Drinks", "Snacks"];
+const categories = activitiesOnly ? [] : ["All", "Food", "Sweets", "Drinks", "Snacks"];
 let activeCategory = activitiesOnly ? "Activities" : "All";
 let cart = {};
 let completedCart = null;
@@ -106,6 +106,8 @@ let sales = JSON.parse(localStorage.getItem("kermessSales") || "[]");
 let currentSaleRecorded = false;
 let currentSaleId = null;
 let lastReportSales = sales;
+let invoiceData = [];
+let editingSale = null;
 let syncInProgress = false;
 const cloud = window.KERMESS_CONFIG || {};
 const cloudEnabled = Boolean(cloud.supabaseUrl && cloud.supabaseAnonKey);
@@ -154,15 +156,21 @@ function cartDetails(source = cart) {
   return products.filter(item => source[item.id]).map(item => ({ ...item, quantity: source[item.id] }));
 }
 
+function productBelongsToPage(productId) {
+  const product = products.find(candidate => candidate.id === Number(productId));
+  return Boolean(product && (activitiesOnly ? product.category === "Activities" : product.category !== "Activities"));
+}
+
 function renderCart() {
   const items = cartDetails();
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  $("#orderNumber").textContent = `#${String(orderNumber).padStart(3, "0")}`;
+  $("#orderNumber").textContent = editingSale ? `· Editing #${String(editingSale.displayNumber).padStart(3, "0")}` : `#${String(orderNumber).padStart(3, "0")}`;
   $("#emptyCart").hidden = items.length > 0;
   $("#cartItems").hidden = items.length === 0;
-  $("#clearOrder").disabled = items.length === 0;
+  $("#clearOrder").disabled = items.length === 0 && !editingSale;
+  $("#clearOrder").textContent = editingSale ? "Cancel edit" : "Clear";
   $("#completeSale").disabled = items.length === 0;
   $("#itemCount").textContent = itemCount;
   $("#totalLbp").textContent = formatLbp(total);
@@ -197,8 +205,10 @@ function showCompletedSale() {
   const items = cartDetails();
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  completedCart = { items, count, total, orderNumber };
-  $("#modalSummary").innerHTML = `Order #${String(orderNumber).padStart(3, "0")} · ${count} ${count === 1 ? "item" : "items"}<br><strong>${formatLbp(total)} · ${formatUsd(total)}</strong>`;
+  completedCart = { items, count, total, orderNumber: editingSale?.displayNumber || orderNumber };
+  $("#saleTitle").textContent = editingSale ? "Confirm invoice changes" : "Enter customer payment";
+  $("#newOrder").textContent = editingSale ? "Save changes" : "Confirm sale & new order";
+  $("#modalSummary").innerHTML = `${editingSale ? "Updating" : "Order"} #${String(completedCart.orderNumber).padStart(3, "0")} · ${count} ${count === 1 ? "item" : "items"}<br><strong>${formatLbp(total)} · ${formatUsd(total)}</strong>`;
   $("#paymentAmount").value = "";
   $("#detectedCurrency").textContent = "—";
   $("#changeResult").hidden = true;
@@ -214,15 +224,20 @@ function startNewOrder() {
   if (!completedCart || !payment || payment.changeLbp < 0) return;
   if (!currentSaleRecorded) {
     currentSaleId ||= makeId();
+    const hiddenItems = editingSale ? editingSale.originalItems.filter(item => !productBelongsToPage(item.id)) : [];
+    const updatedItems = [...hiddenItems, ...completedCart.items.map(({ id, quantity, price }) => ({ id, quantity, price }))];
     sales = sales.filter(sale => sale.id !== currentSaleId);
-    sales.push({ id: currentSaleId, orderNumber, terminalId, synced: false, completedAt: new Date().toISOString(), payment, items: completedCart.items.map(({ id, quantity, price }) => ({ id, quantity, price })) });
+    sales.push({ id: currentSaleId, orderNumber: editingSale?.localOrderNumber || orderNumber, terminalId: editingSale?.terminalId || terminalId, synced: false, completedAt: editingSale?.completedAt || new Date().toISOString(), payment, items: updatedItems });
     localStorage.setItem("kermessSales", JSON.stringify(sales));
     currentSaleRecorded = true;
     syncPendingSales();
   }
   cart = {};
-  orderNumber += 1;
-  localStorage.setItem("kermessOrderNumber", orderNumber);
+  if (!editingSale) {
+    orderNumber += 1;
+    localStorage.setItem("kermessOrderNumber", orderNumber);
+  }
+  editingSale = null;
   currentSaleRecorded = false;
   currentSaleId = null;
   completedCart = null;
@@ -281,10 +296,7 @@ function reportData(source = sales) {
 
 function renderReport(source = sales) {
   const relevantSales = source
-    .map(sale => ({ ...sale, items: sale.items.filter(item => {
-      const product = products.find(candidate => candidate.id === Number(item.id));
-      return product && (activitiesOnly ? product.category === "Activities" : product.category !== "Activities");
-    }) }))
+    .map(sale => ({ ...sale, items: sale.items.filter(item => productBelongsToPage(item.id)) }))
     .filter(sale => sale.items.length);
   lastReportSales = relevantSales;
   const rows = reportData(relevantSales);
@@ -320,6 +332,59 @@ function exportReport() {
   link.download = `kermess-sales-${new Date().toISOString().slice(0, 10)}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function renderInvoices() {
+  const term = $("#invoiceSearch").value.trim().toLowerCase();
+  const visible = invoiceData.filter(sale => {
+    const pageItems = sale.items.filter(item => productBelongsToPage(item.id));
+    const names = pageItems.map(item => products.find(product => product.id === Number(item.id))?.name || "").join(" ");
+    return pageItems.length && `${sale.orderNumber} ${sale.localOrderNumber || ""} ${names}`.toLowerCase().includes(term);
+  }).sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+  $("#emptyInvoices").hidden = visible.length !== 0;
+  $("#invoiceList").innerHTML = visible.map(sale => {
+    const pageItems = sale.items.filter(item => productBelongsToPage(item.id));
+    const count = pageItems.reduce((sum, item) => sum + item.quantity, 0);
+    const total = pageItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const itemText = pageItems.map(item => `${item.quantity} × ${products.find(product => product.id === Number(item.id))?.name || `Item ${item.id}`}`).join(" · ");
+    const date = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(sale.completedAt));
+    return `<article class="invoice-entry"><div class="invoice-reference"><strong>Order #${String(sale.orderNumber).padStart(3, "0")}</strong><span>${date}</span></div><div class="invoice-items"><p>${itemText}</p><small>${count} ${count === 1 ? "item" : "items"}</small></div><div class="invoice-actions"><strong>${formatLbp(total)}</strong><button class="edit-invoice-button" data-edit-invoice="${sale.id}" type="button">Edit invoice</button></div></article>`;
+  }).join("");
+}
+
+async function openInvoices() {
+  $("#invoicesModal").hidden = false;
+  $("#invoiceSearch").value = "";
+  $("#invoicesStatus").textContent = cloudEnabled ? "Loading invoices from all devices…" : "Showing invoices saved on this device";
+  invoiceData = await loadCombinedSales();
+  renderInvoices();
+  const count = invoiceData.filter(sale => sale.items.some(item => productBelongsToPage(item.id))).length;
+  $("#invoicesStatus").textContent = `${count} completed ${count === 1 ? "invoice" : "invoices"} · ${cloudEnabled && navigator.onLine ? "All devices" : "This device"}`;
+}
+
+function closeInvoices() { $("#invoicesModal").hidden = true; }
+
+function editInvoice(saleId) {
+  const sale = invoiceData.find(candidate => candidate.id === saleId);
+  if (!sale) return;
+  cart = {};
+  sale.items.filter(item => productBelongsToPage(item.id)).forEach(item => { cart[item.id] = item.quantity; });
+  editingSale = { id: sale.id, displayNumber: sale.orderNumber, localOrderNumber: sale.localOrderNumber || sale.orderNumber, terminalId: sale.terminalId, completedAt: sale.completedAt, originalItems: sale.items };
+  currentSaleId = sale.id;
+  currentSaleRecorded = false;
+  completedCart = null;
+  closeInvoices();
+  renderCart();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function clearOrCancelOrder() {
+  cart = {};
+  currentSaleRecorded = false;
+  currentSaleId = null;
+  editingSale = null;
+  completedCart = null;
+  renderCart();
 }
 
 function setSyncStatus(state, text) {
@@ -370,8 +435,9 @@ async function loadCombinedSales() {
       if (page.length < pageSize) break;
     }
     const serverSales = remote.map(row => ({ id: row.id, orderNumber: row.order_number, localOrderNumber: row.local_order_number, terminalId: row.terminal_id, completedAt: row.completed_at, items: row.items, synced: true }));
-    const remoteIds = new Set(serverSales.map(sale => sale.id));
-    return [...serverSales, ...sales.filter(sale => !remoteIds.has(sale.id) && !sale.synced)];
+    const pending = sales.filter(sale => !sale.synced);
+    const pendingIds = new Set(pending.map(sale => sale.id));
+    return [...serverSales.filter(sale => !pendingIds.has(sale.id)), ...pending];
   } catch (error) {
     console.warn(error);
     return sales;
@@ -401,7 +467,7 @@ $("#cartItems").addEventListener("click", event => {
   if (button) changeQuantity(button.dataset.id, button.dataset.action === "increase" ? 1 : -1);
 });
 $("#searchInput").addEventListener("input", renderProducts);
-$("#clearOrder").addEventListener("click", () => { cart = {}; currentSaleRecorded = false; renderCart(); });
+$("#clearOrder").addEventListener("click", clearOrCancelOrder);
 $("#completeSale").addEventListener("click", showCompletedSale);
 $("#closeModal").addEventListener("click", closeSale);
 $(".modal-backdrop").addEventListener("click", closeSale);
@@ -412,9 +478,17 @@ $("#openReport").addEventListener("click", openReport);
 $("#closeReport").addEventListener("click", closeReport);
 $("#reportModal .modal-backdrop").addEventListener("click", closeReport);
 $("#exportReport").addEventListener("click", exportReport);
+$("#openInvoices").addEventListener("click", openInvoices);
+$("#closeInvoices").addEventListener("click", closeInvoices);
+$("#invoicesModal .modal-backdrop").addEventListener("click", closeInvoices);
+$("#invoiceSearch").addEventListener("input", renderInvoices);
+$("#invoiceList").addEventListener("click", event => {
+  const button = event.target.closest("[data-edit-invoice]");
+  if (button) editInvoice(button.dataset.editInvoice);
+});
 document.addEventListener("keydown", event => {
   if (event.key === "/" && document.activeElement !== $("#searchInput")) { event.preventDefault(); $("#searchInput").focus(); }
-  if (event.key === "Escape") { closeSale(); closeReport(); }
+  if (event.key === "Escape") { closeSale(); closeReport(); closeInvoices(); }
 });
 
 function updateClock() {
@@ -434,5 +508,5 @@ window.addEventListener("offline", updateConnectionStatus);
 updateConnectionStatus();
 setInterval(syncPendingSales, 15000);
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("./sw.js").catch(error => console.warn("Offline cache unavailable", error));
+  navigator.serviceWorker.register("./sw.js?v=21", { updateViaCache: "none" }).catch(error => console.warn("Offline cache unavailable", error));
 }
