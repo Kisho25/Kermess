@@ -1,4 +1,5 @@
 const EXCHANGE_RATE = 90000;
+const activitiesOnly = /\/games(?:\/index\.html)?\/?$/.test(window.location.pathname);
 
 const products = [
   { id: 1, name: "Shawarma Lahme", price: 600000, category: "Food", icon: "🥙" },
@@ -91,8 +92,8 @@ products.forEach(product => {
 });
 
 const accents = { Food: "#f7dfcb", Sweets: "#f2dce5", Drinks: "#dcecf2", Snacks: "#eee4ca", Activities: "#dce9df" };
-const categories = ["All", "Food", "Sweets", "Drinks", "Snacks", "Activities"];
-let activeCategory = "All";
+const categories = activitiesOnly ? ["Activities"] : ["All", "Food", "Sweets", "Drinks", "Snacks", "Activities"];
+let activeCategory = activitiesOnly ? "Activities" : "All";
 let cart = {};
 let completedCart = null;
 const ORDER_RESET_VERSION = "2026-09-10-001";
@@ -276,14 +277,17 @@ function reportData(source = sales) {
 }
 
 function renderReport(source = sales) {
-  lastReportSales = source;
-  const rows = reportData(source);
+  const relevantSales = activitiesOnly
+    ? source.map(sale => ({ ...sale, items: sale.items.filter(item => products.find(product => product.id === Number(item.id))?.category === "Activities") })).filter(sale => sale.items.length)
+    : source;
+  lastReportSales = relevantSales;
+  const rows = reportData(relevantSales);
   const sold = rows.reduce((sum, row) => sum + row.quantity, 0);
   const revenue = rows.reduce((sum, row) => sum + row.revenue, 0);
   const payment = rows.reduce((sum, row) => sum + (row.payment || 0), 0);
   const profit = rows.reduce((sum, row) => sum + (row.profit || 0), 0);
   const pending = rows.some(row => row.payment == null);
-  $("#reportTimestamp").textContent = `Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())} · ${source.length} completed orders`;
+  $("#reportTimestamp").textContent = `Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())} · ${relevantSales.length} completed orders`;
   $("#reportStats").innerHTML = `<div class="stat-card"><span>Items sold</span><strong>${sold}</strong></div><div class="stat-card"><span>Pay providers</span><strong>${formatLbp(payment)}${pending ? "*" : ""}</strong></div><div class="stat-card profit"><span>Profit</span><strong>${formatLbp(profit)}${pending ? "*" : ""}</strong></div><div class="stat-card cashier"><span>Cashier total</span><strong>${formatLbp(revenue)}</strong><small>${formatUsd(revenue)}</small></div>`;
   $("#emptyReport").hidden = rows.length !== 0;
   $("#reportRows").innerHTML = rows.map(row => `<tr><td>${row.name}</td><td title="${row.contact || ""}">${row.provider || "Pending"}</td><td>${row.quantity}</td><td>${formatLbp(row.price)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.cost)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.price - row.cost)}</td><td>${row.payment == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.payment)}</td><td>${row.profit == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.profit)}</td></tr>`).join("");
@@ -413,6 +417,10 @@ function updateClock() {
 
 renderTabs();
 renderCart();
+if (activitiesOnly) {
+  document.title = "Kermess Games POS";
+  $(".catalog-heading h1").textContent = "Choose an activity";
+}
 updateClock();
 setInterval(updateClock, 30000);
 window.addEventListener("online", syncPendingSales);
