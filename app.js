@@ -6,7 +6,7 @@ const products = [
   { id: 2, name: "Tawouk", price: 500000, category: "Food", icon: "🍢" },
   { id: 3, name: "Kafta", price: 550000, category: "Food", icon: "🥩" },
   { id: 4, name: "Lahme Khanzir", price: 600000, category: "Food", icon: "🍖" },
-  { id: 5, name: "Frisco Tropical", price: 200000, category: "Food", icon: "🥪" },
+  { id: 5, name: "Frisco Tropical", price: 200000, category: "Drinks", icon: "🥪" },
   { id: 6, name: "Zaatar", price: 50000, category: "Food", icon: "🫓" },
   { id: 7, name: "Jebne", price: 200000, category: "Food", icon: "🧀" },
   { id: 8, name: "Keshk", price: 200000, category: "Food", icon: "🥣" },
