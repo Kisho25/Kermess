@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=23" />
+  <link rel="stylesheet" href="styles.css?v=24" />
 </head>
 <body>
   <main class="app-shell">
@@ -96,6 +96,20 @@
     </aside>
   </main>
 
+  <div id="dayWarningModal" class="modal" hidden>
+    <div class="modal-backdrop"></div>
+    <section class="modal-card day-warning-card" role="alertdialog" aria-modal="true" aria-labelledby="dayWarningTitle" aria-describedby="dayWarningText">
+      <div class="day-warning-icon" aria-hidden="true">!</div>
+      <p class="eyebrow">Check sales day</p>
+      <h2 id="dayWarningTitle">The selected day is not today</h2>
+      <p id="dayWarningText" class="day-warning-text"></p>
+      <div class="day-warning-actions">
+        <button id="useTodayButton" class="secondary-button" type="button">Switch to today</button>
+        <button id="keepSelectedDayButton" class="complete-button" type="button">Use selected day</button>
+      </div>
+    </section>
+  </div>
+
   <div id="saleModal" class="modal" hidden>
     <div class="modal-backdrop"></div>
     <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="saleTitle">
@@ -169,6 +183,6 @@
 
   <script src="config.js"></script>
   <script>window.KERMESS_ACTIVITIES_ONLY = true;</script>
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>

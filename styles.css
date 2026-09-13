@@ -58,7 +58,6 @@ button { color: inherit; }
 .sales-day-control { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 700; }
 .sales-day-control input, .filter-control select, .report-toolbar select { height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: 600 12px "DM Sans", sans-serif; }
 .sales-day-control input:focus, .filter-control select:focus, .report-toolbar select:focus { border-color: #86a596; outline: 0; box-shadow: 0 0 0 3px rgba(23,79,58,.08); }
-.sales-day-control input.different-day { border-color: var(--orange); background: #fff6ed; }
 .report-button { border: 1px solid #cad6d0; background: var(--surface); color: var(--green); border-radius: 11px; padding: 9px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .report-button:hover { background: var(--mint); }
 .header-meta time { padding-left: 10px; margin-left: 6px; border-left: 1px solid var(--line); font-weight: 600; color: var(--ink); }
@@ -174,6 +173,12 @@ kbd { border: 1px solid var(--line); border-radius: 5px; background: #f7f4ee; co
 .success-icon { width: 60px; height: 60px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; background: var(--mint); color: var(--green); }
 .success-icon svg { width: 30px; fill: none; stroke: currentColor; stroke-width: 2; }
 .modal-card h2 { margin: 0; font-size: 25px; letter-spacing: -.04em; }
+.day-warning-card { width: min(520px, 100%); padding: 42px; }
+.day-warning-icon { width: 74px; height: 74px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; background: #fff0df; color: var(--orange); font: 800 38px/1 "Manrope", sans-serif; }
+.day-warning-text { margin: 16px 0 26px; color: var(--muted); font-size: 15px; line-height: 1.7; }
+.day-warning-text strong { color: var(--ink); }
+.day-warning-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.day-warning-actions .secondary-button { height: 50px; }
 .modal-summary { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 12px 0 25px; }
 .modal-actions { display: flex; }
 .payment-field { display: block; text-align: left; }
@@ -280,6 +285,8 @@ kbd { border: 1px solid var(--line); border-radius: 5px; background: #f7f4ee; co
   .total-block strong { font-size: 20px; }
   .usd-total strong { font-size: 15px; }
   .complete-button { height: 44px; }
+  .day-warning-card { padding: 34px 22px; }
+  .day-warning-actions { grid-template-columns: 1fr; }
   .report-modal { padding: 0; }.report-card { width: 100%; height: 100%; max-height: none; border-radius: 0; }
   .report-header { padding: 18px 16px; align-items: flex-start; }.report-header h2 { font-size: 21px; }
   .report-header-actions .secondary-button { display: none; }.report-stats { grid-template-columns: 1fr 1fr; padding: 13px 16px; gap: 8px; }

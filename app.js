@@ -146,12 +146,20 @@ function populateDayFilter(selector, source, preferred = selectedSalesDay) {
   select.value = preferred === "all" || days.includes(preferred) ? preferred : "all";
 }
 
-function updateSalesDayControl() {
+function closeDayWarning() { $("#dayWarningModal").hidden = true; }
+
+function showDayWarning() {
+  $("#dayWarningText").innerHTML = `Invoices will be saved under <strong>${formatEventDay(selectedSalesDay)}</strong>, but today is <strong>${formatEventDay(eventDayFromDate())}</strong>. Please confirm which day you want to use.`;
+  $("#dayWarningModal").hidden = false;
+  setTimeout(() => $("#keepSelectedDayButton").focus(), 50);
+}
+
+function updateSalesDayControl(showWarning = false) {
   const input = $("#salesDay");
   input.value = selectedSalesDay;
   const differsFromToday = selectedSalesDay !== eventDayFromDate();
-  input.classList.toggle("different-day", differsFromToday);
   input.title = differsFromToday ? `Orders will be saved under ${formatEventDay(selectedSalesDay)}, not today.` : `Orders will be saved under ${formatEventDay(selectedSalesDay)}.`;
+  if (showWarning && differsFromToday) showDayWarning();
 }
 
 function renderTabs() {
@@ -530,7 +538,14 @@ $("#salesDay").addEventListener("change", event => {
   if (!event.target.value) { updateSalesDayControl(); return; }
   selectedSalesDay = event.target.value;
   localStorage.setItem("kermessSalesDay", selectedSalesDay);
+  updateSalesDayControl(true);
+});
+$("#keepSelectedDayButton").addEventListener("click", closeDayWarning);
+$("#useTodayButton").addEventListener("click", () => {
+  selectedSalesDay = eventDayFromDate();
+  localStorage.setItem("kermessSalesDay", selectedSalesDay);
   updateSalesDayControl();
+  closeDayWarning();
 });
 $("#clearOrder").addEventListener("click", clearOrCancelOrder);
 $("#completeSale").addEventListener("click", showCompletedSale);
@@ -571,7 +586,7 @@ function updateClock() {
 }
 
 renderTabs();
-updateSalesDayControl();
+updateSalesDayControl(true);
 renderCart();
 if (activitiesOnly) {
   document.title = "Kermess Games POS";
@@ -584,5 +599,5 @@ window.addEventListener("offline", updateConnectionStatus);
 updateConnectionStatus();
 setInterval(syncPendingSales, 15000);
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("./sw.js?v=23", { updateViaCache: "none" }).catch(error => console.warn("Offline cache unavailable", error));
+  navigator.serviceWorker.register("./sw.js?v=24", { updateViaCache: "none" }).catch(error => console.warn("Offline cache unavailable", error));
 }
