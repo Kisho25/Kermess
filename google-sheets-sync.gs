@@ -62,7 +62,7 @@ function syncKermessSales() {
   const dailyTotals = {};
   const allTotals = {};
 
-  orders.forEach(order => {
+  orders.filter(order => !order.deleted_at).forEach(order => {
     const eventDay = order.event_day || Utilities.formatDate(new Date(order.completed_at), 'Asia/Beirut', 'yyyy-MM-dd');
     (order.items || []).forEach(item => {
       const product = PRODUCTS[item.id] || [`Item ${item.id}`,null,'Pending',''];
@@ -109,7 +109,7 @@ function fetchAllOrders_(key) {
   const all = [];
   const pageSize = 1000;
   for (let offset = 0; ; offset += pageSize) {
-    const url = `${SUPABASE_URL}/rest/v1/sales_orders?select=id,order_number,local_order_number,terminal_id,event_day,completed_at,items&order=completed_at.asc&limit=${pageSize}&offset=${offset}`;
+    const url = `${SUPABASE_URL}/rest/v1/sales_orders?select=id,order_number,local_order_number,terminal_id,event_day,completed_at,items,deleted_at&order=completed_at.asc&limit=${pageSize}&offset=${offset}`;
     const response = UrlFetchApp.fetch(url, { headers:{ apikey:key, Authorization:`Bearer ${key}` }, muteHttpExceptions:true });
     if (response.getResponseCode() !== 200) throw new Error(`Supabase returned ${response.getResponseCode()}: ${response.getContentText()}`);
     const page = JSON.parse(response.getContentText());

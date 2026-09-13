@@ -245,8 +245,13 @@ kbd { border: 1px solid var(--line); border-radius: 5px; background: #f7f4ee; co
 .invoice-items small { color: var(--muted); font-size: 10px; }
 .invoice-actions { text-align: right; }
 .invoice-actions strong { display: block; margin-bottom: 8px; font-size: 13px; }
-.edit-invoice-button { border: 1px solid #cad6d0; background: var(--mint); color: var(--green); border-radius: 9px; padding: 7px 12px; font-size: 11px; font-weight: 800; cursor: pointer; }
+.invoice-action-buttons { display: flex; justify-content: flex-end; gap: 7px; }
+.edit-invoice-button, .delete-invoice-button, .restore-invoice-button { border: 1px solid #cad6d0; background: var(--mint); color: var(--green); border-radius: 9px; padding: 7px 12px; font-size: 11px; font-weight: 800; cursor: pointer; }
 .edit-invoice-button:hover { background: #cce3d8; }
+.delete-invoice-button { border-color: #e2b9b3; background: #fff2f0; color: #9b3025; }
+.delete-invoice-button:hover { background: #f9dcd7; }
+.restore-invoice-button:hover { background: #cce3d8; }
+.invoice-entry.deleted { opacity: .72; }
 .editing-note { color: var(--orange); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 
 @media (max-width: 950px) {

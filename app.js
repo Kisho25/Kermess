@@ -96,13 +96,16 @@ const categories = activitiesOnly ? [] : ["All", "Food", "Sweets", "Drinks", "Sn
 let activeCategory = activitiesOnly ? "Activities" : "All";
 let cart = {};
 let completedCart = null;
-const ORDER_RESET_VERSION = "2026-09-10-001";
+const ORDER_RESET_VERSION = "2026-09-13-001";
+const REMOVED_TEST_SALE_IDS = new Set(["e07db550-1e04-40cc-a6ab-2d90d7bd3284"]);
+let sales = JSON.parse(localStorage.getItem("kermessSales") || "[]");
 if (localStorage.getItem("kermessOrderResetVersion") !== ORDER_RESET_VERSION) {
+  sales = sales.filter(sale => !REMOVED_TEST_SALE_IDS.has(sale.id));
+  localStorage.setItem("kermessSales", JSON.stringify(sales));
   localStorage.setItem("kermessOrderNumber", "1");
   localStorage.setItem("kermessOrderResetVersion", ORDER_RESET_VERSION);
 }
 let orderNumber = Number(localStorage.getItem("kermessOrderNumber")) || 1;
-let sales = JSON.parse(localStorage.getItem("kermessSales") || "[]");
 let currentSaleRecorded = false;
 let currentSaleId = null;
 let lastReportSales = sales;
@@ -131,7 +134,7 @@ let selectedSalesDay = localStorage.getItem("kermessSalesDay") || eventDayFromDa
 localStorage.setItem("kermessSalesDay", selectedSalesDay);
 
 // Upgrade sales created by earlier versions so they can safely synchronize once.
-sales = sales.map(sale => ({ ...sale, id: sale.id || makeId(), eventDay: sale.eventDay || eventDayFromDate(sale.completedAt), synced: sale.synced === true }));
+sales = sales.map(sale => ({ ...sale, id: sale.id || makeId(), eventDay: sale.eventDay || eventDayFromDate(sale.completedAt), deletedAt: sale.deletedAt || null, synced: sale.synced === true }));
 localStorage.setItem("kermessSales", JSON.stringify(sales));
 
 const $ = (selector) => document.querySelector(selector);
@@ -267,7 +270,7 @@ function startNewOrder() {
     const hiddenItems = editingSale ? editingSale.originalItems.filter(item => !productBelongsToPage(item.id)) : [];
     const updatedItems = [...hiddenItems, ...completedCart.items.map(({ id, quantity, price }) => ({ id, quantity, price }))];
     sales = sales.filter(sale => sale.id !== currentSaleId);
-    sales.push({ id: currentSaleId, orderNumber: editingSale?.localOrderNumber || orderNumber, terminalId: editingSale?.terminalId || terminalId, eventDay: editingSale?.eventDay || selectedSalesDay, synced: false, completedAt: editingSale?.completedAt || new Date().toISOString(), payment, items: updatedItems });
+    sales.push({ id: currentSaleId, orderNumber: editingSale?.localOrderNumber || orderNumber, terminalId: editingSale?.terminalId || terminalId, eventDay: editingSale?.eventDay || selectedSalesDay, deletedAt: null, synced: false, completedAt: editingSale?.completedAt || new Date().toISOString(), payment, items: updatedItems });
     localStorage.setItem("kermessSales", JSON.stringify(sales));
     currentSaleRecorded = true;
     syncPendingSales();
@@ -351,6 +354,7 @@ function sortReportRows(rows) {
 function renderReport() {
   const day = $("#reportDayFilter").value || selectedSalesDay;
   const relevantSales = reportSource
+    .filter(sale => !sale.deletedAt)
     .filter(sale => day === "all" || sale.eventDay === day)
     .map(sale => ({ ...sale, items: sale.items.filter(item => productBelongsToPage(item.id)) }))
     .filter(sale => sale.items.length);
@@ -403,10 +407,12 @@ function exportReport() {
 function renderInvoices() {
   const term = $("#invoiceSearch").value.trim().toLowerCase();
   const day = $("#invoiceDayFilter").value || selectedSalesDay;
+  const status = $("#invoiceStatusFilter").value;
   const visible = invoiceData.filter(sale => {
     const pageItems = sale.items.filter(item => productBelongsToPage(item.id));
     const names = pageItems.map(item => products.find(product => product.id === Number(item.id))?.name || "").join(" ");
-    return (day === "all" || sale.eventDay === day) && pageItems.length && `${sale.orderNumber} ${sale.localOrderNumber || ""} ${names}`.toLowerCase().includes(term);
+    const hasRequestedStatus = status === "deleted" ? Boolean(sale.deletedAt) : !sale.deletedAt;
+    return hasRequestedStatus && (day === "all" || sale.eventDay === day) && pageItems.length && `${sale.orderNumber} ${sale.localOrderNumber || ""} ${names}`.toLowerCase().includes(term);
   }).sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
   $("#emptyInvoices").hidden = visible.length !== 0;
   $("#invoiceList").innerHTML = visible.map(sale => {
@@ -415,14 +421,19 @@ function renderInvoices() {
     const total = pageItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const itemText = pageItems.map(item => `${item.quantity} × ${products.find(product => product.id === Number(item.id))?.name || `Item ${item.id}`}`).join(" · ");
     const date = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(sale.completedAt));
-    return `<article class="invoice-entry"><div class="invoice-reference"><strong>Order #${String(sale.orderNumber).padStart(3, "0")}</strong><span>${formatEventDay(sale.eventDay)}<br>${date}</span></div><div class="invoice-items"><p>${itemText}</p><small>${count} ${count === 1 ? "item" : "items"}</small></div><div class="invoice-actions"><strong>${formatLbp(total)}</strong><button class="edit-invoice-button" data-edit-invoice="${sale.id}" type="button">Edit invoice</button></div></article>`;
+    const buttons = sale.deletedAt
+      ? `<button class="restore-invoice-button" data-restore-invoice="${sale.id}" type="button">Restore</button>`
+      : `<button class="edit-invoice-button" data-edit-invoice="${sale.id}" type="button">Edit</button><button class="delete-invoice-button" data-delete-invoice="${sale.id}" type="button">Delete</button>`;
+    const deletedText = sale.deletedAt ? `<br>Deleted ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(sale.deletedAt))}` : "";
+    return `<article class="invoice-entry ${sale.deletedAt ? "deleted" : ""}"><div class="invoice-reference"><strong>Order #${String(sale.orderNumber).padStart(3, "0")}</strong><span>${formatEventDay(sale.eventDay)}<br>${date}${deletedText}</span></div><div class="invoice-items"><p>${itemText}</p><small>${count} ${count === 1 ? "item" : "items"}</small></div><div class="invoice-actions"><strong>${formatLbp(total)}</strong><div class="invoice-action-buttons">${buttons}</div></div></article>`;
   }).join("");
-  $("#invoicesStatus").textContent = `${visible.length} completed ${visible.length === 1 ? "invoice" : "invoices"} · ${day === "all" ? "All event days" : formatEventDay(day)}`;
+  $("#invoicesStatus").textContent = `${visible.length} ${status === "deleted" ? "deleted" : "current"} ${visible.length === 1 ? "invoice" : "invoices"} · ${day === "all" ? "All event days" : formatEventDay(day)}`;
 }
 
 async function openInvoices() {
   $("#invoicesModal").hidden = false;
   $("#invoiceSearch").value = "";
+  $("#invoiceStatusFilter").value = "current";
   $("#invoicesStatus").textContent = cloudEnabled ? "Loading invoices from all devices…" : "Showing invoices saved on this device";
   invoiceData = await loadCombinedSales();
   populateDayFilter("#invoiceDayFilter", invoiceData, selectedSalesDay);
@@ -433,7 +444,7 @@ function closeInvoices() { $("#invoicesModal").hidden = true; }
 
 function editInvoice(saleId) {
   const sale = invoiceData.find(candidate => candidate.id === saleId);
-  if (!sale) return;
+  if (!sale || sale.deletedAt) return;
   cart = {};
   sale.items.filter(item => productBelongsToPage(item.id)).forEach(item => { cart[item.id] = item.quantity; });
   editingSale = { id: sale.id, displayNumber: sale.orderNumber, localOrderNumber: sale.localOrderNumber || sale.orderNumber, terminalId: sale.terminalId, eventDay: sale.eventDay, completedAt: sale.completedAt, originalItems: sale.items };
@@ -443,6 +454,31 @@ function editInvoice(saleId) {
   closeInvoices();
   renderCart();
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function saveInvoiceStatus(saleId, deletedAt) {
+  const sale = invoiceData.find(candidate => candidate.id === saleId);
+  if (!sale) return;
+  const updatedSale = { ...sale, deletedAt, synced: false };
+  invoiceData = invoiceData.map(candidate => candidate.id === saleId ? updatedSale : candidate);
+  sales = [...sales.filter(candidate => candidate.id !== saleId), updatedSale];
+  localStorage.setItem("kermessSales", JSON.stringify(sales));
+  renderInvoices();
+  syncPendingSales();
+}
+
+function deleteInvoice(saleId) {
+  const sale = invoiceData.find(candidate => candidate.id === saleId);
+  if (!sale || sale.deletedAt) return;
+  if (!window.confirm(`Delete invoice #${String(sale.orderNumber).padStart(3, "0")}? It will be removed from all totals but kept in Deleted invoices.`)) return;
+  saveInvoiceStatus(saleId, new Date().toISOString());
+}
+
+function restoreInvoice(saleId) {
+  const sale = invoiceData.find(candidate => candidate.id === saleId);
+  if (!sale || !sale.deletedAt) return;
+  if (!window.confirm(`Restore invoice #${String(sale.orderNumber).padStart(3, "0")}? It will be included in totals again.`)) return;
+  saveInvoiceStatus(saleId, null);
 }
 
 function clearOrCancelOrder() {
@@ -478,7 +514,7 @@ async function syncPendingSales() {
   syncInProgress = true;
   setSyncStatus("syncing", `Syncing ${pending.length} sale${pending.length === 1 ? "" : "s"}…`);
   try {
-    const payload = pending.map(sale => ({ id: sale.id, terminal_id: sale.terminalId || terminalId, local_order_number: sale.orderNumber, event_day: sale.eventDay, completed_at: sale.completedAt, items: sale.items }));
+    const payload = pending.map(sale => ({ id: sale.id, terminal_id: sale.terminalId || terminalId, local_order_number: sale.localOrderNumber || sale.orderNumber, event_day: sale.eventDay, completed_at: sale.completedAt, items: sale.items, deleted_at: sale.deletedAt || null }));
     await supabaseRequest("sales_orders?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(payload) });
     const ids = new Set(pending.map(sale => sale.id));
     sales = sales.map(sale => ids.has(sale.id) ? { ...sale, synced: true } : sale);
@@ -497,11 +533,11 @@ async function loadCombinedSales() {
     const remote = [];
     const pageSize = 1000;
     for (let offset = 0; ; offset += pageSize) {
-      const page = await supabaseRequest(`sales_orders?select=id,order_number,local_order_number,terminal_id,event_day,completed_at,items&order=completed_at.asc&limit=${pageSize}&offset=${offset}`);
+      const page = await supabaseRequest(`sales_orders?select=id,order_number,local_order_number,terminal_id,event_day,completed_at,items,deleted_at&order=completed_at.asc&limit=${pageSize}&offset=${offset}`);
       remote.push(...page);
       if (page.length < pageSize) break;
     }
-    const serverSales = remote.map(row => ({ id: row.id, orderNumber: row.order_number, localOrderNumber: row.local_order_number, terminalId: row.terminal_id, eventDay: row.event_day || eventDayFromDate(row.completed_at), completedAt: row.completed_at, items: row.items, synced: true }));
+    const serverSales = remote.map(row => ({ id: row.id, orderNumber: row.order_number, localOrderNumber: row.local_order_number, terminalId: row.terminal_id, eventDay: row.event_day || eventDayFromDate(row.completed_at), completedAt: row.completed_at, items: row.items, deletedAt: row.deleted_at || null, synced: true }));
     const pending = sales.filter(sale => !sale.synced);
     const pendingIds = new Set(pending.map(sale => sale.id));
     return [...serverSales.filter(sale => !pendingIds.has(sale.id)), ...pending];
@@ -572,9 +608,14 @@ $("#closeInvoices").addEventListener("click", closeInvoices);
 $("#invoicesModal .modal-backdrop").addEventListener("click", closeInvoices);
 $("#invoiceSearch").addEventListener("input", renderInvoices);
 $("#invoiceDayFilter").addEventListener("change", renderInvoices);
+$("#invoiceStatusFilter").addEventListener("change", renderInvoices);
 $("#invoiceList").addEventListener("click", event => {
-  const button = event.target.closest("[data-edit-invoice]");
-  if (button) editInvoice(button.dataset.editInvoice);
+  const editButton = event.target.closest("[data-edit-invoice]");
+  const deleteButton = event.target.closest("[data-delete-invoice]");
+  const restoreButton = event.target.closest("[data-restore-invoice]");
+  if (editButton) editInvoice(editButton.dataset.editInvoice);
+  else if (deleteButton) deleteInvoice(deleteButton.dataset.deleteInvoice);
+  else if (restoreButton) restoreInvoice(restoreButton.dataset.restoreInvoice);
 });
 document.addEventListener("keydown", event => {
   if (event.key === "/" && document.activeElement !== $("#searchInput")) { event.preventDefault(); $("#searchInput").focus(); }
@@ -599,5 +640,5 @@ window.addEventListener("offline", updateConnectionStatus);
 updateConnectionStatus();
 setInterval(syncPendingSales, 15000);
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("./sw.js?v=24", { updateViaCache: "none" }).catch(error => console.warn("Offline cache unavailable", error));
+  navigator.serviceWorker.register("./sw.js?v=25", { updateViaCache: "none" }).catch(error => console.warn("Offline cache unavailable", error));
 }

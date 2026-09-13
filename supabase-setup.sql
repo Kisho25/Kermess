@@ -7,6 +7,7 @@ create table if not exists public.sales_orders (
   event_day date not null default ((now() at time zone 'Asia/Beirut')::date),
   completed_at timestamptz not null default now(),
   items jsonb not null,
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -16,6 +17,9 @@ alter table public.sales_orders add column if not exists event_day date;
 update public.sales_orders set event_day = date '2026-09-12' where event_day is null;
 alter table public.sales_orders alter column event_day set default ((now() at time zone 'Asia/Beirut')::date);
 alter table public.sales_orders alter column event_day set not null;
+
+-- Soft-deleted invoices remain available for review, but are excluded from reports.
+alter table public.sales_orders add column if not exists deleted_at timestamptz;
 
 alter table public.sales_orders enable row level security;
 
