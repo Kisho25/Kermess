@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=22" />
+  <link rel="stylesheet" href="styles.css?v=23" />
 </head>
 <body>
   <main class="app-shell">
@@ -20,6 +20,7 @@
           <img class="brand-logos" src="festival-logos.png" alt="Kermess festival organizations" />
         </a>
         <div class="header-actions">
+          <label class="sales-day-control"><span>Sales day</span><input id="salesDay" type="date" /></label>
           <button id="openInvoices" class="report-button" type="button">Invoices</button>
           <button id="openReport" class="report-button" type="button">Sales report</button>
           <div class="header-meta">
@@ -133,10 +134,11 @@
           <button id="closeReport" class="modal-close inline" aria-label="Close">×</button>
         </div>
       </header>
+      <div class="report-toolbar"><label>Show sales from <select id="reportDayFilter"></select></label></div>
       <div id="reportStats" class="report-stats"></div>
       <div class="report-table-wrap">
         <table class="report-table">
-          <thead><tr><th>Item</th><th>Provider</th><th>Sold</th><th>Sale price</th><th>Provider/item</th><th>Profit/item</th><th>Total to provider</th><th>Total profit</th></tr></thead>
+          <thead><tr><th><button class="sort-button" data-sort="name" type="button">Item</button></th><th><button class="sort-button" data-sort="provider" type="button">Provider</button></th><th><button class="sort-button" data-sort="quantity" type="button">Sold</button></th><th><button class="sort-button" data-sort="price" type="button">Sale price</button></th><th><button class="sort-button" data-sort="cost" type="button">Provider/item</button></th><th><button class="sort-button" data-sort="profitPerItem" type="button">Profit/item</button></th><th><button class="sort-button" data-sort="payment" type="button">Total to provider</button></th><th><button class="sort-button" data-sort="profit" type="button">Total profit</button></th></tr></thead>
           <tbody id="reportRows"></tbody><tfoot id="reportTotals"></tfoot>
         </table>
         <div id="emptyReport" class="empty-state" hidden><span>▤</span><h2>No completed sales yet</h2><p>Completed orders will appear here.</p></div>
@@ -156,6 +158,7 @@
         <button id="closeInvoices" class="modal-close inline" aria-label="Close">×</button>
       </header>
       <div class="invoice-toolbar">
+        <label class="filter-control">Sales day<select id="invoiceDayFilter"></select></label>
         <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="invoiceSearch" type="search" placeholder="Search order or item" autocomplete="off" /></label>
       </div>
       <div id="invoiceList" class="invoice-list"></div>
@@ -164,6 +167,6 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="app.js?v=22"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>

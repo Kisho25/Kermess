@@ -59,22 +59,43 @@ function syncKermessSales() {
 
   const orders = fetchAllOrders_(key);
   const rawRows = [];
-  const totals = {};
+  const dailyTotals = {};
+  const allTotals = {};
 
   orders.forEach(order => {
+    const eventDay = order.event_day || Utilities.formatDate(new Date(order.completed_at), 'Asia/Beirut', 'yyyy-MM-dd');
     (order.items || []).forEach(item => {
       const product = PRODUCTS[item.id] || [`Item ${item.id}`,null,'Pending',''];
       const quantity = Number(item.quantity) || 0;
       const price = Number(item.price) || 0;
-      rawRows.push([order.order_number, order.local_order_number, new Date(order.completed_at), order.terminal_id, order.id, product[0], quantity, price]);
-      if (!totals[item.id]) totals[item.id] = { quantity:0, revenue:0, latestPrice:price };
-      totals[item.id].quantity += quantity;
-      totals[item.id].revenue += quantity * price;
-      totals[item.id].latestPrice = price;
+      rawRows.push([eventDay, order.order_number, order.local_order_number, new Date(order.completed_at), order.terminal_id, order.id, product[0], quantity, price]);
+      if (!dailyTotals[eventDay]) dailyTotals[eventDay] = {};
+      addToTotals_(dailyTotals[eventDay], item.id, quantity, price);
+      addToTotals_(allTotals, item.id, quantity, price);
     });
   });
 
-  const reportRows = Object.keys(totals).sort((a,b) => Number(a)-Number(b)).map(id => {
+  const dailyReportRows = [];
+  Object.keys(dailyTotals).sort().forEach(day => {
+    buildReportRows_(dailyTotals[day]).forEach(row => dailyReportRows.push([day].concat(row)));
+  });
+  const allReportRows = buildReportRows_(allTotals);
+
+  writeSheet_('Sales Log', ['Sales Day','Global Order','Local Order','Completed At','Terminal ID','Sale UUID','Item','Quantity','Sale Price LBP'], rawRows, [9]);
+  writeSheet_('Item Report', ['Sales Day','Item','Provider','Contact','Items Sold','Sale Price LBP','Provider / Item LBP','Profit / Item LBP','Total to Provider LBP','Total Profit LBP'], dailyReportRows, [6,7,8,9,10]);
+  writeSheet_('All Days Report', ['Item','Provider','Contact','Items Sold','Sale Price LBP','Provider / Item LBP','Profit / Item LBP','Total to Provider LBP','Total Profit LBP'], allReportRows, [5,6,7,8,9]);
+  PropertiesService.getScriptProperties().setProperty('LAST_SUCCESSFUL_SYNC', new Date().toISOString());
+}
+
+function addToTotals_(totals, id, quantity, price) {
+  if (!totals[id]) totals[id] = { quantity:0, revenue:0, latestPrice:price };
+  totals[id].quantity += quantity;
+  totals[id].revenue += quantity * price;
+  totals[id].latestPrice = price;
+}
+
+function buildReportRows_(totals) {
+  return Object.keys(totals).sort((a,b) => Number(a)-Number(b)).map(id => {
     const product = PRODUCTS[id] || [`Item ${id}`,null,'Pending',''];
     const total = totals[id];
     const providerPayment = product[1] === null ? 'Pending' : product[1] * total.quantity;
@@ -82,17 +103,13 @@ function syncKermessSales() {
     const profitPerItem = product[1] === null ? 'Pending' : total.latestPrice - product[1];
     return [product[0], product[2], product[3], total.quantity, total.latestPrice, product[1] === null ? 'Pending' : product[1], profitPerItem, providerPayment, profit];
   });
-
-  writeSheet_('Sales Log', ['Global Order','Local Order','Completed At','Terminal ID','Sale UUID','Item','Quantity','Sale Price LBP'], rawRows, [8]);
-  writeSheet_('Item Report', ['Item','Provider','Contact','Items Sold','Sale Price LBP','Provider / Item LBP','Profit / Item LBP','Total to Provider LBP','Total Profit LBP'], reportRows, [5,6,7,8,9]);
-  PropertiesService.getScriptProperties().setProperty('LAST_SUCCESSFUL_SYNC', new Date().toISOString());
 }
 
 function fetchAllOrders_(key) {
   const all = [];
   const pageSize = 1000;
   for (let offset = 0; ; offset += pageSize) {
-    const url = `${SUPABASE_URL}/rest/v1/sales_orders?select=id,order_number,local_order_number,terminal_id,completed_at,items&order=completed_at.asc&limit=${pageSize}&offset=${offset}`;
+    const url = `${SUPABASE_URL}/rest/v1/sales_orders?select=id,order_number,local_order_number,terminal_id,event_day,completed_at,items&order=completed_at.asc&limit=${pageSize}&offset=${offset}`;
     const response = UrlFetchApp.fetch(url, { headers:{ apikey:key, Authorization:`Bearer ${key}` }, muteHttpExceptions:true });
     if (response.getResponseCode() !== 200) throw new Error(`Supabase returned ${response.getResponseCode()}: ${response.getContentText()}`);
     const page = JSON.parse(response.getContentText());

@@ -11,7 +11,7 @@ This connects spreadsheet `1hyHAxrLELHvrinB6Ao_UHGSytGLjcE5T1xMZZQCxePQ` to the 
 7. Select `saveSupabaseSettings` in the function menu and click **Run**. Approve Google's permissions.
 8. Select `setupKermessSync` and click **Run** once.
 
-The script creates **Sales Log** and **Item Report** tabs and refreshes them from Supabase approximately every minute. It rebuilds the tabs from sale UUIDs, so synchronization retries cannot duplicate data.
+The script creates **Sales Log**, **Item Report**, and **All Days Report** tabs and refreshes them from Supabase approximately every minute. **Sales Log** includes the event day for every invoice, **Item Report** keeps daily totals separated, and **All Days Report** combines the full event. It rebuilds the tabs from sale UUIDs, so synchronization retries cannot duplicate data.
 
 To download a computer copy, open the Google Sheet and choose **File → Download → Microsoft Excel (.xlsx)** or **Comma-separated values (.csv)**.
 

@@ -106,22 +106,53 @@ let sales = JSON.parse(localStorage.getItem("kermessSales") || "[]");
 let currentSaleRecorded = false;
 let currentSaleId = null;
 let lastReportSales = sales;
+let reportSource = sales;
 let invoiceData = [];
 let editingSale = null;
 let syncInProgress = false;
+let reportSort = { key: "name", direction: "asc" };
 const cloud = window.KERMESS_CONFIG || {};
 const cloudEnabled = Boolean(cloud.supabaseUrl && cloud.supabaseAnonKey);
 const makeId = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const terminalId = localStorage.getItem("kermessTerminalId") || makeId();
 localStorage.setItem("kermessTerminalId", terminalId);
 
+const EVENT_TIME_ZONE = "Asia/Beirut";
+function eventDayFromDate(value = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: EVENT_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value));
+  const get = type => parts.find(part => part.type === type)?.value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+function formatEventDay(day) {
+  if (!day) return "Unknown day";
+  return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
+}
+let selectedSalesDay = localStorage.getItem("kermessSalesDay") || eventDayFromDate();
+localStorage.setItem("kermessSalesDay", selectedSalesDay);
+
 // Upgrade sales created by earlier versions so they can safely synchronize once.
-sales = sales.map(sale => ({ ...sale, id: sale.id || makeId(), synced: sale.synced === true }));
+sales = sales.map(sale => ({ ...sale, id: sale.id || makeId(), eventDay: sale.eventDay || eventDayFromDate(sale.completedAt), synced: sale.synced === true }));
 localStorage.setItem("kermessSales", JSON.stringify(sales));
 
 const $ = (selector) => document.querySelector(selector);
 const formatLbp = (amount) => `${new Intl.NumberFormat("en-US").format(amount)} LBP`;
 const formatUsd = (amount) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount / EXCHANGE_RATE);
+
+function populateDayFilter(selector, source, preferred = selectedSalesDay) {
+  const select = $(selector);
+  const days = [...new Set(source.map(sale => sale.eventDay).filter(Boolean))].sort().reverse();
+  if (preferred !== "all" && preferred && !days.includes(preferred)) days.unshift(preferred);
+  select.innerHTML = `<option value="all">All event days</option>${days.map(day => `<option value="${day}">${formatEventDay(day)}</option>`).join("")}`;
+  select.value = preferred === "all" || days.includes(preferred) ? preferred : "all";
+}
+
+function updateSalesDayControl() {
+  const input = $("#salesDay");
+  input.value = selectedSalesDay;
+  const differsFromToday = selectedSalesDay !== eventDayFromDate();
+  input.classList.toggle("different-day", differsFromToday);
+  input.title = differsFromToday ? `Orders will be saved under ${formatEventDay(selectedSalesDay)}, not today.` : `Orders will be saved under ${formatEventDay(selectedSalesDay)}.`;
+}
 
 function renderTabs() {
   $("#categoryTabs").innerHTML = categories.map(category =>
@@ -208,7 +239,8 @@ function showCompletedSale() {
   completedCart = { items, count, total, orderNumber: editingSale?.displayNumber || orderNumber };
   $("#saleTitle").textContent = editingSale ? "Confirm invoice changes" : "Enter customer payment";
   $("#newOrder").textContent = editingSale ? "Save changes" : "Confirm sale & new order";
-  $("#modalSummary").innerHTML = `${editingSale ? "Updating" : "Order"} #${String(completedCart.orderNumber).padStart(3, "0")} · ${count} ${count === 1 ? "item" : "items"}<br><strong>${formatLbp(total)} · ${formatUsd(total)}</strong>`;
+  const saleDay = editingSale?.eventDay || selectedSalesDay;
+  $("#modalSummary").innerHTML = `${editingSale ? "Updating" : "Order"} #${String(completedCart.orderNumber).padStart(3, "0")} · ${count} ${count === 1 ? "item" : "items"}<br>${formatEventDay(saleDay)}<br><strong>${formatLbp(total)} · ${formatUsd(total)}</strong>`;
   $("#paymentAmount").value = "";
   $("#detectedCurrency").textContent = "—";
   $("#changeResult").hidden = true;
@@ -227,7 +259,7 @@ function startNewOrder() {
     const hiddenItems = editingSale ? editingSale.originalItems.filter(item => !productBelongsToPage(item.id)) : [];
     const updatedItems = [...hiddenItems, ...completedCart.items.map(({ id, quantity, price }) => ({ id, quantity, price }))];
     sales = sales.filter(sale => sale.id !== currentSaleId);
-    sales.push({ id: currentSaleId, orderNumber: editingSale?.localOrderNumber || orderNumber, terminalId: editingSale?.terminalId || terminalId, synced: false, completedAt: editingSale?.completedAt || new Date().toISOString(), payment, items: updatedItems });
+    sales.push({ id: currentSaleId, orderNumber: editingSale?.localOrderNumber || orderNumber, terminalId: editingSale?.terminalId || terminalId, eventDay: editingSale?.eventDay || selectedSalesDay, synced: false, completedAt: editingSale?.completedAt || new Date().toISOString(), payment, items: updatedItems });
     localStorage.setItem("kermessSales", JSON.stringify(sales));
     currentSaleRecorded = true;
     syncPendingSales();
@@ -290,56 +322,83 @@ function reportData(source = sales) {
   return products.filter(item => totals[item.id]).map(item => {
     const { quantity, revenue } = totals[item.id];
     const payment = item.cost == null ? null : item.cost * quantity;
-    return { ...item, quantity, revenue, payment, profit: payment == null ? null : revenue - payment };
+    return { ...item, quantity, revenue, payment, profitPerItem: item.cost == null ? null : item.price - item.cost, profit: payment == null ? null : revenue - payment };
   });
 }
 
-function renderReport(source = sales) {
-  const relevantSales = source
+function sortReportRows(rows) {
+  const { key, direction } = reportSort;
+  const factor = direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const left = a[key];
+    const right = b[key];
+    if (left == null && right == null) return a.name.localeCompare(b.name);
+    if (left == null) return 1;
+    if (right == null) return -1;
+    const comparison = typeof left === "string" ? left.localeCompare(right, undefined, { sensitivity: "base" }) : left - right;
+    return comparison === 0 ? a.name.localeCompare(b.name) : comparison * factor;
+  });
+}
+
+function renderReport() {
+  const day = $("#reportDayFilter").value || selectedSalesDay;
+  const relevantSales = reportSource
+    .filter(sale => day === "all" || sale.eventDay === day)
     .map(sale => ({ ...sale, items: sale.items.filter(item => productBelongsToPage(item.id)) }))
     .filter(sale => sale.items.length);
   lastReportSales = relevantSales;
-  const rows = reportData(relevantSales);
+  const rows = sortReportRows(reportData(relevantSales));
   const sold = rows.reduce((sum, row) => sum + row.quantity, 0);
   const revenue = rows.reduce((sum, row) => sum + row.revenue, 0);
   const payment = rows.reduce((sum, row) => sum + (row.payment || 0), 0);
   const profit = rows.reduce((sum, row) => sum + (row.profit || 0), 0);
   const pending = rows.some(row => row.payment == null);
-  $("#reportTimestamp").textContent = `Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())} · ${relevantSales.length} completed orders`;
+  $("#reportTimestamp").textContent = `${day === "all" ? "All event days" : formatEventDay(day)} · ${relevantSales.length} completed orders · Updated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}`;
   $("#reportStats").innerHTML = `<div class="stat-card"><span>Items sold</span><strong>${sold}</strong></div><div class="stat-card"><span>Pay providers</span><strong>${formatLbp(payment)}${pending ? "*" : ""}</strong></div><div class="stat-card profit"><span>Profit</span><strong>${formatLbp(profit)}${pending ? "*" : ""}</strong></div><div class="stat-card cashier"><span>Cashier total</span><strong>${formatLbp(revenue)}</strong><small>${formatUsd(revenue)}</small></div>`;
   $("#emptyReport").hidden = rows.length !== 0;
   $("#reportRows").innerHTML = rows.map(row => `<tr><td>${row.name}</td><td title="${row.contact || ""}">${row.provider || "Pending"}</td><td>${row.quantity}</td><td>${formatLbp(row.price)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.cost)}</td><td>${row.cost == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.price - row.cost)}</td><td>${row.payment == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.payment)}</td><td>${row.profit == null ? '<span class="pending-value">Pending</span>' : formatLbp(row.profit)}</td></tr>`).join("");
   $("#reportTotals").innerHTML = rows.length ? `<tr><td colspan="2">TOTAL</td><td>${sold}</td><td>—</td><td>—</td><td>—</td><td>${formatLbp(payment)}${pending ? "*" : ""}</td><td>${formatLbp(profit)}${pending ? "*" : ""}</td></tr>` : "";
+  document.querySelectorAll(".sort-button").forEach(button => {
+    const active = button.dataset.sort === reportSort.key;
+    button.classList.toggle("active", active);
+    button.dataset.direction = active ? (reportSort.direction === "asc" ? "▲" : "▼") : "";
+    button.setAttribute("aria-sort", active ? (reportSort.direction === "asc" ? "ascending" : "descending") : "none");
+  });
 }
 
 async function openReport() {
   $("#reportModal").hidden = false;
   $("#reportSyncStatus").textContent = cloudEnabled ? "Loading combined report…" : "Local device report";
-  renderReport(sales);
-  const combined = await loadCombinedSales();
-  renderReport(combined);
+  reportSource = sales;
+  populateDayFilter("#reportDayFilter", reportSource, selectedSalesDay);
+  renderReport();
+  reportSource = await loadCombinedSales();
+  populateDayFilter("#reportDayFilter", reportSource, $("#reportDayFilter").value);
+  renderReport();
   const queued = sales.filter(sale => !sale.synced).length;
   $("#reportSyncStatus").textContent = cloudEnabled ? (queued ? `${queued} sale${queued === 1 ? "" : "s"} waiting to sync` : "All devices synchronized") : "Cloud not configured · local report only";
 }
 function closeReport() { $("#reportModal").hidden = true; }
 
 function exportReport() {
-  const heading = ["Item", "Provider", "Contact", "Items sold", "Sale price LBP", "Provider per item LBP", "Profit per item LBP", "Total to provider LBP", "Total profit LBP"];
-  const body = reportData(lastReportSales).map(row => [row.name, row.provider || "Pending", row.contact || "", row.quantity, row.price, row.cost ?? "Pending", row.cost == null ? "Pending" : row.price - row.cost, row.payment ?? "Pending", row.profit ?? "Pending"]);
+  const heading = ["Sales day", "Item", "Provider", "Contact", "Items sold", "Sale price LBP", "Provider per item LBP", "Profit per item LBP", "Total to provider LBP", "Total profit LBP"];
+  const selectedDay = $("#reportDayFilter").value;
+  const body = sortReportRows(reportData(lastReportSales)).map(row => [selectedDay === "all" ? "All event days" : selectedDay, row.name, row.provider || "Pending", row.contact || "", row.quantity, row.price, row.cost ?? "Pending", row.cost == null ? "Pending" : row.price - row.cost, row.payment ?? "Pending", row.profit ?? "Pending"]);
   const csv = [heading, ...body].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  link.download = `kermess-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `kermess-sales-${selectedDay === "all" ? "all-days" : selectedDay}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
 
 function renderInvoices() {
   const term = $("#invoiceSearch").value.trim().toLowerCase();
+  const day = $("#invoiceDayFilter").value || selectedSalesDay;
   const visible = invoiceData.filter(sale => {
     const pageItems = sale.items.filter(item => productBelongsToPage(item.id));
     const names = pageItems.map(item => products.find(product => product.id === Number(item.id))?.name || "").join(" ");
-    return pageItems.length && `${sale.orderNumber} ${sale.localOrderNumber || ""} ${names}`.toLowerCase().includes(term);
+    return (day === "all" || sale.eventDay === day) && pageItems.length && `${sale.orderNumber} ${sale.localOrderNumber || ""} ${names}`.toLowerCase().includes(term);
   }).sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
   $("#emptyInvoices").hidden = visible.length !== 0;
   $("#invoiceList").innerHTML = visible.map(sale => {
@@ -348,8 +407,9 @@ function renderInvoices() {
     const total = pageItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const itemText = pageItems.map(item => `${item.quantity} × ${products.find(product => product.id === Number(item.id))?.name || `Item ${item.id}`}`).join(" · ");
     const date = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(sale.completedAt));
-    return `<article class="invoice-entry"><div class="invoice-reference"><strong>Order #${String(sale.orderNumber).padStart(3, "0")}</strong><span>${date}</span></div><div class="invoice-items"><p>${itemText}</p><small>${count} ${count === 1 ? "item" : "items"}</small></div><div class="invoice-actions"><strong>${formatLbp(total)}</strong><button class="edit-invoice-button" data-edit-invoice="${sale.id}" type="button">Edit invoice</button></div></article>`;
+    return `<article class="invoice-entry"><div class="invoice-reference"><strong>Order #${String(sale.orderNumber).padStart(3, "0")}</strong><span>${formatEventDay(sale.eventDay)}<br>${date}</span></div><div class="invoice-items"><p>${itemText}</p><small>${count} ${count === 1 ? "item" : "items"}</small></div><div class="invoice-actions"><strong>${formatLbp(total)}</strong><button class="edit-invoice-button" data-edit-invoice="${sale.id}" type="button">Edit invoice</button></div></article>`;
   }).join("");
+  $("#invoicesStatus").textContent = `${visible.length} completed ${visible.length === 1 ? "invoice" : "invoices"} · ${day === "all" ? "All event days" : formatEventDay(day)}`;
 }
 
 async function openInvoices() {
@@ -357,9 +417,8 @@ async function openInvoices() {
   $("#invoiceSearch").value = "";
   $("#invoicesStatus").textContent = cloudEnabled ? "Loading invoices from all devices…" : "Showing invoices saved on this device";
   invoiceData = await loadCombinedSales();
+  populateDayFilter("#invoiceDayFilter", invoiceData, selectedSalesDay);
   renderInvoices();
-  const count = invoiceData.filter(sale => sale.items.some(item => productBelongsToPage(item.id))).length;
-  $("#invoicesStatus").textContent = `${count} completed ${count === 1 ? "invoice" : "invoices"} · ${cloudEnabled && navigator.onLine ? "All devices" : "This device"}`;
 }
 
 function closeInvoices() { $("#invoicesModal").hidden = true; }
@@ -369,7 +428,7 @@ function editInvoice(saleId) {
   if (!sale) return;
   cart = {};
   sale.items.filter(item => productBelongsToPage(item.id)).forEach(item => { cart[item.id] = item.quantity; });
-  editingSale = { id: sale.id, displayNumber: sale.orderNumber, localOrderNumber: sale.localOrderNumber || sale.orderNumber, terminalId: sale.terminalId, completedAt: sale.completedAt, originalItems: sale.items };
+  editingSale = { id: sale.id, displayNumber: sale.orderNumber, localOrderNumber: sale.localOrderNumber || sale.orderNumber, terminalId: sale.terminalId, eventDay: sale.eventDay, completedAt: sale.completedAt, originalItems: sale.items };
   currentSaleId = sale.id;
   currentSaleRecorded = false;
   completedCart = null;
@@ -411,7 +470,7 @@ async function syncPendingSales() {
   syncInProgress = true;
   setSyncStatus("syncing", `Syncing ${pending.length} sale${pending.length === 1 ? "" : "s"}…`);
   try {
-    const payload = pending.map(sale => ({ id: sale.id, terminal_id: sale.terminalId || terminalId, local_order_number: sale.orderNumber, completed_at: sale.completedAt, items: sale.items }));
+    const payload = pending.map(sale => ({ id: sale.id, terminal_id: sale.terminalId || terminalId, local_order_number: sale.orderNumber, event_day: sale.eventDay, completed_at: sale.completedAt, items: sale.items }));
     await supabaseRequest("sales_orders?on_conflict=id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(payload) });
     const ids = new Set(pending.map(sale => sale.id));
     sales = sales.map(sale => ids.has(sale.id) ? { ...sale, synced: true } : sale);
@@ -430,11 +489,11 @@ async function loadCombinedSales() {
     const remote = [];
     const pageSize = 1000;
     for (let offset = 0; ; offset += pageSize) {
-      const page = await supabaseRequest(`sales_orders?select=id,order_number,local_order_number,terminal_id,completed_at,items&order=completed_at.asc&limit=${pageSize}&offset=${offset}`);
+      const page = await supabaseRequest(`sales_orders?select=id,order_number,local_order_number,terminal_id,event_day,completed_at,items&order=completed_at.asc&limit=${pageSize}&offset=${offset}`);
       remote.push(...page);
       if (page.length < pageSize) break;
     }
-    const serverSales = remote.map(row => ({ id: row.id, orderNumber: row.order_number, localOrderNumber: row.local_order_number, terminalId: row.terminal_id, completedAt: row.completed_at, items: row.items, synced: true }));
+    const serverSales = remote.map(row => ({ id: row.id, orderNumber: row.order_number, localOrderNumber: row.local_order_number, terminalId: row.terminal_id, eventDay: row.event_day || eventDayFromDate(row.completed_at), completedAt: row.completed_at, items: row.items, synced: true }));
     const pending = sales.filter(sale => !sale.synced);
     const pendingIds = new Set(pending.map(sale => sale.id));
     return [...serverSales.filter(sale => !pendingIds.has(sale.id)), ...pending];
@@ -467,6 +526,12 @@ $("#cartItems").addEventListener("click", event => {
   if (button) changeQuantity(button.dataset.id, button.dataset.action === "increase" ? 1 : -1);
 });
 $("#searchInput").addEventListener("input", renderProducts);
+$("#salesDay").addEventListener("change", event => {
+  if (!event.target.value) { updateSalesDayControl(); return; }
+  selectedSalesDay = event.target.value;
+  localStorage.setItem("kermessSalesDay", selectedSalesDay);
+  updateSalesDayControl();
+});
 $("#clearOrder").addEventListener("click", clearOrCancelOrder);
 $("#completeSale").addEventListener("click", showCompletedSale);
 $("#closeModal").addEventListener("click", closeSale);
@@ -478,10 +543,20 @@ $("#openReport").addEventListener("click", openReport);
 $("#closeReport").addEventListener("click", closeReport);
 $("#reportModal .modal-backdrop").addEventListener("click", closeReport);
 $("#exportReport").addEventListener("click", exportReport);
+$("#reportDayFilter").addEventListener("change", renderReport);
+$(".report-table thead").addEventListener("click", event => {
+  const button = event.target.closest("[data-sort]");
+  if (!button) return;
+  const key = button.dataset.sort;
+  if (reportSort.key === key) reportSort.direction = reportSort.direction === "asc" ? "desc" : "asc";
+  else reportSort = { key, direction: key === "name" || key === "provider" ? "asc" : "desc" };
+  renderReport();
+});
 $("#openInvoices").addEventListener("click", openInvoices);
 $("#closeInvoices").addEventListener("click", closeInvoices);
 $("#invoicesModal .modal-backdrop").addEventListener("click", closeInvoices);
 $("#invoiceSearch").addEventListener("input", renderInvoices);
+$("#invoiceDayFilter").addEventListener("change", renderInvoices);
 $("#invoiceList").addEventListener("click", event => {
   const button = event.target.closest("[data-edit-invoice]");
   if (button) editInvoice(button.dataset.editInvoice);
@@ -496,6 +571,7 @@ function updateClock() {
 }
 
 renderTabs();
+updateSalesDayControl();
 renderCart();
 if (activitiesOnly) {
   document.title = "Kermess Games POS";
@@ -508,5 +584,5 @@ window.addEventListener("offline", updateConnectionStatus);
 updateConnectionStatus();
 setInterval(syncPendingSales, 15000);
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("./sw.js?v=21", { updateViaCache: "none" }).catch(error => console.warn("Offline cache unavailable", error));
+  navigator.serviceWorker.register("./sw.js?v=23", { updateViaCache: "none" }).catch(error => console.warn("Offline cache unavailable", error));
 }
