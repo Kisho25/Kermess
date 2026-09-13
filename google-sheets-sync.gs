@@ -33,7 +33,8 @@ const PRODUCTS = {
   34:['Face Painting',0,'Akhawiyat','03 773 860'],
   35:['Mini Games',15000,'Play Aura','70 938 434'],
   36:['Box · per hit',35000,'Play Aura','70 938 434'],
-  37:['VR',360000,'Jack Chewan','70 161 814']
+  37:['VR',360000,'Jack Chewan','70 161 814'],
+  38:['Gonflable Offre',0,'AC Inflatables','']
 };
 
 /** Paste the same sb_publishable_ key used in config.js, then run this once. */

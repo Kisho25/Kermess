@@ -38,7 +38,8 @@ const products = [
   { id: 34, name: "Face Painting", price: 50000, category: "Activities", icon: "🎨" },
   { id: 35, name: "Bon Jeu", price: 50000, category: "Activities", icon: "🎯" },
   { id: 36, name: "Box · per hit", price: 50000, category: "Activities", icon: "🥊" },
-  { id: 37, name: "VR", price: 500000, category: "Activities", icon: "🥽" }
+  { id: 37, name: "VR", price: 500000, category: "Activities", icon: "🥽" },
+  { id: 38, name: "Gonflable Offre", price: 500000, category: "Activities", icon: "🏰" }
 ];
 
 // [Kermess sale price, provider/person price, provider, contact]
@@ -79,7 +80,8 @@ const foodFinancials = {
   34: [50000, 0, "Akhawiyat", "03 773 860"],
   35: [50000, 15000, "Play Aura", "70 938 434"],
   36: [50000, 35000, "Play Aura", "70 938 434"],
-  37: [500000, 360000, "Jack Chewan", "70 161 814"]
+  37: [500000, 360000, "Jack Chewan", "70 161 814"],
+  38: [500000, 0, "AC Inflatables", ""]
 };
 
 products.forEach(product => {
